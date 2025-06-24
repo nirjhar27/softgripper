@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chain Bending Pneumatic Gripper</title>
+  <style>
+    body { font-family: Arial; text-align: center; background: #f0f0f0; }
+    canvas { border: 1px solid #ccc; margin-top: 20px; background: white; }
+    input { margin: 5px; }
+  </style>
+</head>
+<body>
+  <h2>Chain-Like Pneumatic Gripper Simulation</h2>
+  <label>Pressure (P in Pa): </label>
+  <input type="range" id="pressure" min="0" max="1000000" step="100" value="0">
+  <span id="pVal">0</span><br><br>
+
+  <label>Segment Height a (mm):</label>
+  <input type="number" id="aInput" value="20" step="1">
+
+  <label>Bulk Modulus k (Pa):</label>
+  <input type="number" id="kInput" value="200000" step="1000">
+
+  <label>Arc Length s (mm):</label>
+  <input type="number" id="sInput" value="15" step="1">
+
+  <label>Wall Length t (mm):</label>
+  <input type="number" id="tInput" value="5" step="1">
+
+  <button onclick="updateValues()">Update</button>
+  <canvas id="canvas" width="900" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const pressureSlider = document.getElementById("pressure");
+    const pVal = document.getElementById("pVal");
+    const aInput = document.getElementById("aInput");
+    const kInput = document.getElementById("kInput");
+    const sInput = document.getElementById("sInput");
+    const tInput = document.getElementById("tInput");
+
+    let a = parseFloat(aInput.value);
+    let k = parseFloat(kInput.value);
+    let s = parseFloat(sInput.value);
+    let t = parseFloat(tInput.value);
+    const scale = 3; // pixels per mm
+    const numSegments = 10;
+
+    function drawGripper(P) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#0077cc";
+
+      const R = P === 0 ? Infinity : ((a * k) / (2 * P)) + a;
+      const theta = P === 0 ? 0 : s / R;
+
+      let x = 100;
+      let y = canvas.height / 2;
+      let angle = 0;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+
+      for (let i = 0; i < numSegments; i++) {
+        // 1. Arc segment
+        if (P > 0) {
+          const arcRadius = R * scale;
+          const arcCenterX = x - arcRadius * Math.sin(angle);
+          const arcCenterY = y + arcRadius * Math.cos(angle);
+
+          const startAngle = angle - Math.PI / 2;
+          const endAngle = startAngle + theta;
+
+          ctx.arc(arcCenterX, arcCenterY, arcRadius, startAngle, endAngle, false);
+
+          angle += theta;
+          x = arcCenterX + arcRadius * Math.sin(angle);
+          y = arcCenterY - arcRadius * Math.cos(angle);
+        } else {
+          x += s * scale;
+          ctx.lineTo(x, y);
+        }
+
+        // 2. Wall segment
+        const dx = t * Math.cos(angle) * scale;
+        const dy = t * Math.sin(angle) * scale;
+        x += dx;
+        y += dy;
+        ctx.lineTo(x, y);
+      }
+
+      ctx.stroke();
+
+      ctx.fillStyle = "black";
+      ctx.font = "14px Arial";
+      ctx.fillText(`P = ${P} Pa`, 20, 30);
+      ctx.fillText(`R = ${R === Infinity ? '∞' : R.toFixed(1)} mm`, 20, 50);
+    }
+
+    function updateValues() {
+      a = parseFloat(aInput.value);
+      k = parseFloat(kInput.value);
+      s = parseFloat(sInput.value);
+      t = parseFloat(tInput.value);
+      drawGripper(parseInt(pressureSlider.value));
+    }
+
+    pressureSlider.addEventListener("input", () => {
+      const P = parseInt(pressureSlider.value);
+      pVal.textContent = P;
+      drawGripper(P);
+    });
+
+    drawGripper(0);
+  </script>
+</body>
+</html>
