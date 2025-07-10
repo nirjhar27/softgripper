@@ -9,14 +9,21 @@
     input { margin: 5px; }
   </style>
 </head>
-<body>
+  <body>
   <h2>Chain-Like Pneumatic Gripper Simulation</h2>
+
   <label>Pressure (P in Pa): </label>
   <input type="range" id="pressure" min="0" max="1000000" step="100" value="0">
   <span id="pVal">0</span><br><br>
 
-  <label>Segment Height a (mm):</label>
-  <input type="number" id="aInput" value="20" step="1">
+  <label>Number of Sections:</label>
+  <input type="number" id="sectionsInput" value="6" min="1" step="1">
+
+  <label>Lowest a (mm):</label>
+  <input type="number" id="lowestAInput" value="1" step="0.1">
+
+  <label>Increment in a (mm):</label>
+  <input type="number" id="aIncrementInput" value="0.2" step="0.1"><br><br>
 
   <label>Bulk Modulus k (Pa):</label>
   <input type="number" id="kInput" value="200000" step="1000">
@@ -27,6 +34,22 @@
   <label>Wall Length t (mm):</label>
   <input type="number" id="tInput" value="5" step="1">
 
+  <br><br>
+<h3>Animation Controls</h3>
+<label>Min Pressure (Pa):</label>
+<input type="number" id="minPressureInput" value="0" step="100">
+
+<label>Max Pressure (Pa):</label>
+<input type="number" id="maxPressureInput" value="1000000" step="100">
+
+<label>Speed (ms per step):</label>
+<input type="number" id="animationSpeedInput" value="30" step="10">
+
+<br>
+<button onclick="startAnimation()">Start Animation</button>
+<button onclick="stopAnimation()">Stop Animation</button>
+
+
   <button onclick="updateValues()">Update</button>
   <canvas id="canvas" width="900" height="600"></canvas>
 
@@ -36,25 +59,25 @@
 
     const pressureSlider = document.getElementById("pressure");
     const pVal = document.getElementById("pVal");
-    const aInput = document.getElementById("aInput");
+
+    const sectionsInput = document.getElementById("sectionsInput");
+    const lowestAInput = document.getElementById("lowestAInput");
+    const aIncrementInput = document.getElementById("aIncrementInput");
     const kInput = document.getElementById("kInput");
     const sInput = document.getElementById("sInput");
     const tInput = document.getElementById("tInput");
 
-    let a = parseFloat(aInput.value);
+    let segmentAs = [];
     let k = parseFloat(kInput.value);
     let s = parseFloat(sInput.value);
     let t = parseFloat(tInput.value);
-    const scale = 3; // pixels per mm
-    const numSegments = 10;
+    const scale = 3;
 
+    
     function drawGripper(P) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 3;
       ctx.strokeStyle = "#0077cc";
-
-      const R = P === 0 ? Infinity : ((a * k) / (2 * P)) + a;
-      const theta = P === 0 ? 0 : s / R;
 
       let x = 100;
       let y = canvas.height / 2;
@@ -63,8 +86,11 @@
       ctx.beginPath();
       ctx.moveTo(x, y);
 
-      for (let i = 0; i < numSegments; i++) {
-        // 1. Arc segment
+      for (let i = 0; i < segmentAs.length; i++) {
+        const a = segmentAs[i];
+        const R = P === 0 ? Infinity : ((a * k) / (2 * P)) + a;
+        const theta = P === 0 ? 0 : s / R;
+
         if (P > 0) {
           const arcRadius = R * scale;
           const arcCenterX = x - arcRadius * Math.sin(angle);
@@ -83,7 +109,6 @@
           ctx.lineTo(x, y);
         }
 
-        // 2. Wall segment
         const dx = t * Math.cos(angle) * scale;
         const dy = t * Math.sin(angle) * scale;
         x += dx;
@@ -92,18 +117,25 @@
       }
 
       ctx.stroke();
-
       ctx.fillStyle = "black";
       ctx.font = "14px Arial";
       ctx.fillText(`P = ${P} Pa`, 20, 30);
-      ctx.fillText(`R = ${R === Infinity ? '∞' : R.toFixed(1)} mm`, 20, 50);
     }
 
+
     function updateValues() {
-      a = parseFloat(aInput.value);
+      const numSections = parseInt(sectionsInput.value);
+      const lowestA = parseFloat(lowestAInput.value);
+      const aIncrement = parseFloat(aIncrementInput.value);
       k = parseFloat(kInput.value);
       s = parseFloat(sInput.value);
       t = parseFloat(tInput.value);
+
+      segmentAs = [];
+      for (let i = 0; i < numSections; i++) {
+        segmentAs.unshift(lowestA + i * aIncrement); // reverse order: largest 'a' first
+      }
+
       drawGripper(parseInt(pressureSlider.value));
     }
 
@@ -113,7 +145,58 @@
       drawGripper(P);
     });
 
-    drawGripper(0);
+    updateValues();
+    let animationFrameId;
+let animating = false;
+let currentP = 0;
+let increasing = true;
+
+function startAnimation() {
+  const minP = parseInt(document.getElementById("minPressureInput").value);
+  const maxP = parseInt(document.getElementById("maxPressureInput").value);
+  const speed = parseInt(document.getElementById("animationSpeedInput").value);
+
+  if (isNaN(minP) || isNaN(maxP) || minP >= maxP) {
+    alert("Please enter valid pressure limits.");
+    return;
+  }
+
+  animating = true;
+  currentP = minP;
+  increasing = true;
+
+  function animate() {
+    if (!animating) return;
+
+    drawGripper(currentP);
+    pVal.textContent = currentP;
+    pressureSlider.value = currentP;
+
+    if (increasing) {
+      currentP += 5000; // step size
+      if (currentP >= maxP) {
+        currentP = maxP;
+        increasing = false;
+      }
+    } else {
+      currentP -= 5000;
+      if (currentP <= minP) {
+        currentP = minP;
+        increasing = true;
+      }
+    }
+
+    animationFrameId = setTimeout(() => requestAnimationFrame(animate), speed);
+  }
+
+  animate();
+}
+
+function stopAnimation() {
+  animating = false;
+  clearTimeout(animationFrameId);
+}
+
   </script>
 </body>
 </html>
